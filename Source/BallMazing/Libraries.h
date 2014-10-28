@@ -14,10 +14,13 @@ class BALLMAZING_API ULibraries : public UBlueprintFunctionLibrary
 	
 	UFUNCTION(BlueprintCallable, Category = "Femtoduino Libraries")
 
-	
+	static FRotator GetQRotation();
 
-	static FString GetFemtoduinoData();
+	UFUNCTION(BlueprintCallable, Category = "Femtoduino Libraries")
+	static FRotator GetFemtoduinoData();
 	
+	UFUNCTION(BlueprintCallable, Category = "Femtoduino Libraries")
+		static void SetHome(FRotator h);
 	/*class Serial;*/
 	
 

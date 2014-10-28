@@ -6,11 +6,72 @@
 #include <stdio.h>
 #include <string>
 
-//typedef char*(*_GetStuff)(); //our typedef is must be the same type of our dll function.
 
-//class _Serial;
-//typedef bool (_IsConnected)();
-//typedef char *(*_GetFemtoduinoData)();
+
+// convert hex ascii to int
+// return true on success, false on failure
+bool hexasciitoint(char& ival, char character)
+{
+	if (character >= 48 && character <= 57) // [0-9]
+	{
+		ival = static_cast<char>(character - 48);
+		return true;
+	}
+	else if (character >= 65 && character <= 70) // [A-F]
+	{
+		ival = static_cast<char>(10 + character - 65);
+		return true;
+	}
+	else if (character >= 97 && character <= 102) // [a-f]
+	{
+		ival = static_cast<char>(10 + character - 97);
+		return true;
+	}
+
+	ival = 0;
+	return false;
+}
+
+// convert array of 8 hex ascii to f32
+// The input hexascii is required to be a little-endian representation
+// as used in the iridas file format
+// "AD10753F" -> 0.9572857022285461f on ALL architectures
+
+bool hexasciitofloat(float& fval, const char * ascii)
+{
+	// Convert all ASCII numbers to their numerical representations
+	char asciinums[8];
+	for (unsigned int i = 0; i<8; ++i)
+	{
+		if (!hexasciitoint(asciinums[i], ascii[i]))
+		{
+			return false;
+		}
+	}
+
+	unsigned char * fvalbytes = reinterpret_cast<unsigned char *>(&fval);
+	fvalbytes[0] = (unsigned char)(asciinums[1] | (asciinums[0] << 4));
+	fvalbytes[1] = (unsigned char)(asciinums[3] | (asciinums[2] << 4));
+	fvalbytes[2] = (unsigned char)(asciinums[5] | (asciinums[4] << 4));
+	fvalbytes[3] = (unsigned char)(asciinums[7] | (asciinums[6] << 4));
+	//#if OCIO_LITTLE_ENDIAN
+	//	// Since incoming values are little endian, and we're on little endian
+	//	// preserve the byte order
+	//	fvalbytes[0] = (unsigned char)(asciinums[1] | (asciinums[0] << 4));
+	//	fvalbytes[1] = (unsigned char)(asciinums[3] | (asciinums[2] << 4));
+	//	fvalbytes[2] = (unsigned char)(asciinums[5] | (asciinums[4] << 4));
+	//	fvalbytes[3] = (unsigned char)(asciinums[7] | (asciinums[6] << 4));
+	//#else
+	//	// Since incoming values are little endian, and we're on big endian
+	//	// flip the byte order
+	//	fvalbytes[0] = (unsigned char)(asciinums[1] | (asciinums[0] << 4));
+	//	fvalbytes[2] = (unsigned char)(asciinums[3] | (asciinums[2] << 4));
+	//	fvalbytes[1] = (unsigned char)(asciinums[5] | (asciinums[4] << 4));
+	//	fvalbytes[0] = (unsigned char)(asciinums[7] | (asciinums[6] << 4));
+	//#endif
+	return true;
+}
+
 
 ULibraries::ULibraries(const class FPostConstructInitializeProperties& PCIP)
 	: Super(PCIP)
@@ -18,18 +79,102 @@ ULibraries::ULibraries(const class FPostConstructInitializeProperties& PCIP)
 	
 }
 
-Femtoduino::Serial * FemtoduinoPointer = new Femtoduino::Serial("\\\\.\\COM9");
+Femtoduino::Serial * FemtoduinoPointer = new Femtoduino::Serial("\\\\.\\COM7");
+FQuat hq = FQuat::Identity;
 
-FString ULibraries::GetFemtoduinoData()
+FRotator ULibraries::GetFemtoduinoData()
 {
 	
-
-	char incomingData[256] = "";
-	int dataLength = 256;
+	/*char* buffer;
+	bool sent = false;
+	buffer = "q\n";
+	*/	bool sent = FemtoduinoPointer->WriteData("y\n", 32);
+	
+	char incomingData[250] = "";
+	int dataLength = 250;
+	Sleep(50);
 	FemtoduinoPointer->ReadData(incomingData, dataLength);
-	FString out = incomingData;
-	return out;
+	
+
+	FString out=incomingData;
+	TArray<FString> s;
+	const TCHAR* Delims[] = { TEXT(" ") };
+	out.ParseIntoArray(&s, Delims, 1);
+	FRotator test(FCString::Atof(*s[1]), FCString::Atof(*s[0]), FCString::Atof(*s[2]));
+	
+	return test;
 }
+
+
+
+void ULibraries::SetHome(FRotator h)
+{
+	float q1, q2, q3, q4;
+	bool sent = FemtoduinoPointer->WriteData("w\n", 32);
+	char parse1[10], parse2[10], parse3[10], parse4[10];
+	char incomingData[250];
+	int dataLength = 250;
+	Sleep(50);
+	FemtoduinoPointer->ReadData(incomingData, dataLength);
+
+	_memccpy(&parse1, incomingData, ',', 8);
+	_memccpy(&parse2, &incomingData[9], ',', 8);
+	_memccpy(&parse3, &incomingData[18], ',', 8);
+	_memccpy(&parse4, &incomingData[27], ',', 8);
+
+
+
+	hexasciitofloat(q1, parse1);
+	hexasciitofloat(q2, parse2);
+	hexasciitofloat(q3, parse3);
+	hexasciitofloat(q4, parse4);
+
+
+	FQuat newQ = FQuat(-q2, -q3, -q4, q1);
+	hq = newQ;
+}
+
+
+
+FRotator ULibraries::GetQRotation()
+{
+	
+	float q1, q2, q3, q4;
+	bool sent = FemtoduinoPointer->WriteData("w\n", 32);
+	char parse1[10], parse2[10], parse3[10], parse4[10];
+	char incomingData[250];
+	int dataLength = 250;
+	Sleep(50);
+	FemtoduinoPointer->ReadData(incomingData, dataLength);
+
+	_memccpy(&parse1, incomingData,',' ,8);
+	_memccpy(&parse2, &incomingData[9],',', 8);
+	_memccpy(&parse3, &incomingData[18], ',', 8);
+	_memccpy(&parse4, &incomingData[27], ',', 8);
+
+
+
+	hexasciitofloat(q1, parse1);
+	hexasciitofloat(q2, parse2);
+	hexasciitofloat(q3, parse3);
+	hexasciitofloat(q4, parse4);
+	
+	
+	FQuat newQ = FQuat(q2,q3,q4,q1);
+
+	if (!hq.Equals(FQuat::Identity))
+	{
+		return (hq*newQ).Rotator();
+	}
+
+	//newQ.Normalize(1.1);
+	//FQuat hq = FQuat::Identity;
+	//FQuat next = newQ*hq;     //FQuat::Slerp(newQ,current.Quaternion(),.5);
+	//FRotator test = next.Rotator();
+
+	return newQ.Rotator();
+}
+
 
 
 
