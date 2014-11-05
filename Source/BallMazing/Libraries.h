@@ -17,7 +17,7 @@ class BALLMAZING_API ULibraries : public UBlueprintFunctionLibrary
 	static FRotator GetQRotation();
 
 	UFUNCTION(BlueprintCallable, Category = "Femtoduino Libraries")
-	static FRotator GetFemtoduinoData();
+		static void WriteFemtoduino();
 	
 	UFUNCTION(BlueprintCallable, Category = "Femtoduino Libraries")
 		static void SetHome(FRotator h);
