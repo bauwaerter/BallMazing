@@ -1,4 +1,4 @@
 BallMazing
 ==========
 
-A game where you control the world and try to navigate a ball through a maze.
+A game made with UE4 where you control a ball and navigate through a maze.
